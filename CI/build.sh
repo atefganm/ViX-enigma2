@@ -4,8 +4,8 @@
 # You're not allowed to remove my copyright or reuse this script without putting this header.
 
 setup_git() {
-  git config --global user.email "bot@openvix.co.uk"
-  git config --global user.name "openvix-bot"
+  git config --global user.email "atef_anim_1974@yahoo.com"
+  git config --global user.name "atefganm"
 }
 
 commit_files() {
@@ -20,7 +20,7 @@ commit_files() {
 }
 
 upload_files() {
-  git remote add upstream https://${GITHUB_TOKEN}@github.com/OpenViX/enigma2.git > /dev/null 2>&1
+  git remote add upstream https://${GITHUB_TOKEN}@github.com/atefganm/ViX-enigma2.git > /dev/null 2>&1
   git push --quiet upstream Developer || echo "failed to push with error $?"
 }
 

@@ -102,16 +102,19 @@ AM_CONDITIONAL(DAGS3, test "$BOXTYPE" == "dags3")
 AM_CONDITIONAL(DAGS4, test "$BOXTYPE" == "dags4")
 AM_CONDITIONAL(DAGS5, test "$BOXTYPE" == "dags5")
 AM_CONDITIONAL(DAGS6, test "$BOXTYPE" == "dags6")
-AM_CONDITIONAL(DM500HD, test "$BOXTYPE" == "dm500hd")
-AM_CONDITIONAL(DM500HDV2, test "$BOXTYPE" == "dm500hdv2")
+AM_CONDITIONAL(DM900, test "$BOXTYPE" == "dm900")
+AM_CONDITIONAL(DM920, test "$BOXTYPE" == "dm920")
+AM_CONDITIONAL(DM7080, test "$BOXTYPE" == "dm7080")
+AM_CONDITIONAL(DM820, test "$BOXTYPE" == "dm820")
+AM_CONDITIONAL(DM520, test "$BOXTYPE" == "dm520")
 AM_CONDITIONAL(DM7020HD, test "$BOXTYPE" == "dm7020hd")
 AM_CONDITIONAL(DM7020HDV2, test "$BOXTYPE" == "dm7020hdv2")
 AM_CONDITIONAL(DM800, test "$BOXTYPE" == "dm800")
 AM_CONDITIONAL(DM8000, test "$BOXTYPE" == "dm8000")
 AM_CONDITIONAL(DM800SE, test "$BOXTYPE" == "dm800se")
 AM_CONDITIONAL(DM800SEV2, test "$BOXTYPE" == "dm800sev2")
-AM_CONDITIONAL(DM900, test "$BOXTYPE" == "dm900")
-AM_CONDITIONAL(DM920, test "$BOXTYPE" == "dm920")
+AM_CONDITIONAL(DM500HD, test "$BOXTYPE" == "dm500hd")
+AM_CONDITIONAL(DM500HDV2, test "$BOXTYPE" == "dm500hdv2")
 AM_CONDITIONAL(E3HD, test "$BOXTYPE" == "e3hd")
 AM_CONDITIONAL(EBOX5000, test "$BOXTYPE" == "ebox5000")
 AM_CONDITIONAL(EBOX5100, test "$BOXTYPE" == "ebox5100")
@@ -183,9 +186,24 @@ AM_CONDITIONAL(XC7358, test "$BOXTYPE" == xc7358)
 AM_CONDITIONAL(XC7358CI, test "$BOXTYPE" == xc7358ci)
 AM_CONDITIONAL(XC7362, test "$BOXTYPE" == xc7362)
 AM_CONDITIONAL(XP1000, test "$BOXTYPE" == xp1000)
+AM_CONDITIONAL(HAVE_COLORLCD3, test "$BOXTYPE" == dm7080)
+AM_CONDITIONAL(HAVE_COLORLCD2, test "$BOXTYPE" == dm800se -o "$BOXTYPE" == dm800sev2 -o "$BOXTYPE" == dm820)
+AM_CONDITIONAL(HAVE_COLORLCD1, test "$BOXTYPE" == dm8000 -o "$BOXTYPE" == dm800 -o "$BOXTYPE" == dm7020hd -o "$BOXTYPE" == dm7020hdv2)
+AM_CONDITIONAL(HAVE_GRAUTEC8000, test "$BOXTYPE" == dm8000)
+AM_CONDITIONAL(HAVE_GRAUTEC70X0, test "$BOXTYPE" == dm7020hd -o "$BOXTYPE" == dm7020hdv2 -o "$BOXTYPE" == dm7080)
+AM_CONDITIONAL(LCD_FRAMEBUFFER_MODE, test "$BOXTYPE" == et8500 -o "$BOXTYPE" == et8500s -o "$BOXTYPE" == 8100s)
 
 AS_IF([test "$BOXTYPE" == "dm900"],[AC_DEFINE(HWDM900, 1,[dm900])])
 AS_IF([test "$BOXTYPE" == "dm920"],[AC_DEFINE(HWDM920, 1,[dm920])])
+AS_IF([test "$BOXTYPE" == "dm7080"],[AC_DEFINE(HWDM7080, 1,[dm7080])])
+AS_IF([test "$BOXTYPE" == "dm820"],[AC_DEFINE(HWDM820, 1,[dm820])])
+AS_IF([test "$BOXTYPE" == "dm520" -o "$BOXTYPE" == "dm525"],[AC_DEFINE(HWDM520, 1,[dm520])])
+AS_IF([test "$BOXTYPE" == "dm800se"],[AC_DEFINE(HWDM800SE, 1,[dm800se])])
+AS_IF([test "$BOXTYPE" == "dm500hd"],[AC_DEFINE(HWDM500HD, 1,[dm500hd])])
+AS_IF([test "$BOXTYPE" == "dm800sev2"],[AC_DEFINE(HWDM800SEV2, 1,[dm800sev2])])
+AS_IF([test "$BOXTYPE" == "dm500hdv2"],[AC_DEFINE(HWDM500HDV2, 1,[dm500hdv2])])
+AS_IF([test "$BOXTYPE" == "dm8000"],[AC_DEFINE(HWDM8000, 1,[dm8000])])
+AS_IF([test "$BOXTYPE" == "dm7020hd" -o "$BOXTYPE" == "dm7020hdv2"],[AC_DEFINE(HWDM7020HD, 1,[dm7020hd])])
 AS_IF([test "$MACHINEBUILD" == "dual"],[AC_DEFINE(HWDUAL, 1,[dual4k])])
 AS_IF([test "$BOXTYPE" == "et7x00"],[AC_DEFINE(HWET7X00, 1,[et7x00])])
 AS_IF([test "$MACHINEBUILD" == "gbip4k"],[AC_DEFINE(HWGBIP4K, 1,[gbip4k])])
@@ -359,6 +377,16 @@ if test x"$with7segment" != xno ; then
 	AC_DEFINE(HAVE_7SEGMENT, 1,[Define when using an ascii based lcd device])
 fi
 AM_CONDITIONAL(HAVE_7SEGMENT, test x"$with7segment" != xno)
+
+AC_ARG_WITH(bwlcd96,
+	AS_HELP_STRING([--with-bwlcd96], [use 96x64 1bpp black and white display, yes or no]),
+	[[withbwlcd96=$withval]],
+	[[withbwlcd96=no]]
+)
+if test x"$withbwlcd96" != xno ; then
+	AC_DEFINE(HAVE_BWLCD96, 1,[Define when using a 96x64 black and white display device])
+fi
+AM_CONDITIONAL(HAVE_BWLCD96, test x"$withbwlcd96" != xno)
 
 AC_ARG_WITH(colorlcd,
 	AS_HELP_STRING([--with-colorlcd], [use 96x64 16bpp color display, yes or no]),
@@ -583,11 +611,21 @@ if test "x$use_egl" = "xyes" -a \( "$BOXTYPE" == "dm900" -o "$BOXTYPE" == "dm920
 	AC_DEFINE(HAVE_DREAMBOX_EGL, 1, [Dreambox VC5/BEGL EGL pixmap backend available])
 fi
 
-if test "$BOXTYPE" == "dm900" -o "$BOXTYPE" == "dm920"; then
+if test "$BOXTYPE" == "dm7080" -o "$BOXTYPE" == "dm820" -o "$BOXTYPE" == "dm900" -o "$BOXTYPE" == "dm920" -o "$BOXTYPE" == "dm520"; then
 	AC_DEFINE(CONFIG_ION, 1,[define BOX use ION Allocator])
+fi
+
+if test "$BOXTYPE" == "dm7080" -o "$BOXTYPE" == "dm820" -o "$BOXTYPE" == "dm800se" -o "$BOXTYPE" == "dm800sev2" -o "$BOXTYPE" == "dm7020hd" -o "$BOXTYPE" == "dm7020hdv2" -o "$BOXTYPE" == "dm900" -o "$BOXTYPE" == "dm920"; then
+	AC_DEFINE(DREAMBOX_DUAL_TUNER, 1,[define BOXTYPE DM7080])
+fi
+
+if test "$BOXTYPE" == "dm7080" -o "$BOXTYPE" == "dm820" -o "$BOXTYPE" == "dm900" -o "$BOXTYPE" == "dm920"; then
 	AC_DEFINE(HAVE_HDMIIN_DM, 1,[has hdmi in dm])
+fi
+
+if test "$BOXTYPE" == "dm900" -o "$BOXTYPE" == "dm920"; then
 	AC_DEFINE(LCD_DM900_Y_OFFSET, 4,[define LCD Y offset for dm900 and dm920])
-	AC_DEFINE(DREAMBOX_DUAL_TUNER, 1,[define it is dreambox dual tuner present])
+	AC_DEFINE(HAVE_DM_FBC, 1,[define for dm900 and dm920])
 	AC_DEFINE(FORCE_ALPHABLENDING_ACCELERATION, 1,[define when the framebuffer acceleration has alphablending support, but detection slow down all])
 fi
 
@@ -629,9 +667,9 @@ if test "$BOXTYPE" == "g300"; then
 	AC_DEFINE(FORCE_ADVANCED_REMOTE, 1,[define to fixup the input device identification when the remote control is actually an 'advanced' remote (with play/forward/rewind keys)])
 fi
 
-if test "$BOXTYPE" == "et8500"; then
+if test "$BOXTYPE" == "et8500" -o "$BOXTYPE" == "et8500s"; then
 	AC_DEFINE(FORCE_ALPHABLENDING_ACCELERATION, 1,[define when the framebuffer acceleration has alphablending support, but detection slow down all])
-	AC_DEFINE(FORCE_ADVANCED_REMOTE, 1,[define to fixup the input device identification when the remote control is actually an 'advanced' remote (with play/forward/rewind keys)])
+	AC_DEFINE(LCD_FRAMEBUFFER_MODE, 1,[define the framebuffer LCD mode])
 fi
 
 if test "$BOXTYPE" == "sf4008"; then

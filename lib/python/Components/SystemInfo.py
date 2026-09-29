@@ -81,7 +81,13 @@ BoxInfo.boxInfo["kernel"] = Versions.split(" ", 3)[2].split("-", 1)[0].strip() i
 SystemInfo = BoxInfo.boxInfo
 
 
-if BoxInfo.getItem("model") in ("dm900", "dm920", "et13000"):
+if BoxInfo.getItem("model") in ("dm800se", "dm800sev2"):
+	CHIPSET = "7413"
+elif BoxInfo.getItem("model") in ("dm7080", "dm820"):
+	CHIPSET = "7435"
+elif BoxInfo.getItem("model") in ("dm520", "dm525"):
+	CHIPSET = "73625"
+elif BoxInfo.getItem("model") in ("dm900", "dm920", "et13000"):
 	CHIPSET = "7252s"
 elif BoxInfo.getItem("model") in ("hd51", "vs1500", "h7", "h17"):
 	CHIPSET = "7251s"

@@ -4638,6 +4638,7 @@ class InfoBarHdmi:
 			self.hdmi_enabled_full = False
 			self.session.nav.playService(slist.servicelist.getCurrent())
 
+
 class InfoBarHdmi2:
 	def __init__(self):
 		self.hdmi_enabled = False

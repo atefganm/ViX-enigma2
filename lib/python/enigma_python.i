@@ -507,6 +507,7 @@ extern const char *getEnigmaLastCommitDate();
 extern const char *getEnigmaLastCommitHash();
 extern const char *getE2Rev();
 extern const char *getOARev();
+extern const char *getBoxType();
 extern const char *getGStreamerVersionString();
 extern void dump_malloc_stats(void);
 extern void pauseInit(void);

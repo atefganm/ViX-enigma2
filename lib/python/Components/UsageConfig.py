@@ -1017,7 +1017,7 @@ def InitUsageConfig():
 		def setZapmodeDM(el):
 			print('[UsageConfig] >>> zapmodeDM')
 		config.misc.zapmodeDM = ConfigSelection(default="black", choices=[("black", _("Black screen")), ("hold", _("Hold screen"))])
-		config.misc.zapmodeDM.addNotifier(setZapmodeDM, immediate_feedback = False)
+		config.misc.zapmodeDM.addNotifier(setZapmodeDM, immediate_feedback=False)
 
 	config.subtitles = ConfigSubsection()
 	config.subtitles.ttx_subtitle_colors = ConfigSelection(default="1", choices=[

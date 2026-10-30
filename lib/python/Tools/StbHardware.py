@@ -1,24 +1,25 @@
 from fcntl import ioctl
 from struct import pack, unpack
 from os import path
-from enigma import getBoxType
+from boxbranding import getBoxType, getBrandOEM
 
 
 def getFPVersion():
-	ret = None
+	version = None
 	try:
-		if getBoxType() in ('dm7080', 'dm820', 'dm520', 'dm525', 'dm900', 'dm920'):
-			ret = open("/proc/stb/fp/version", "r").read()
+		if getBrandOEM() == "blackbox" and isfile("/proc/stb/info/micomver"):
+			version = fileReadLine("/proc/stb/info/micomver", source=MODULE_NAME)
+		elif getBoxType() in ('dm7080', 'dm820', 'dm520', 'dm525', 'dm900', 'dm920'):
+			version = open("/proc/stb/fp/version", "r").read()
 		else:
-			ret = long(open("/proc/stb/fp/version", "r").read())
+			version = int(open("/proc/stb/fp/version", "r").read())
 	except IOError:
 		try:
-			fp = open("/dev/dbox/fp0")
-			ret = ioctl(fp.fileno(), 0)
-			fp.close()
-		except IOError:
-			print("[StbHardware] Error: getFPVersion failed!")
-	return ret
+			with open("/dev/dbox/fp0") as fd:
+				version = ioctl(fd.fileno(), 0)
+		except (IOError, OSError) as err:
+			print("[StbHardware] Error %d: Unable to access '/dev/dbox/fp0', getFPVersion failed!  (%s)" % (err.errno, err.strerror))
+	return version
 
 
 def setFPWakeuptime(wutime):

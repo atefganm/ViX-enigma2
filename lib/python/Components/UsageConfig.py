@@ -12,6 +12,7 @@ from Tools.Directories import resolveFilename, SCOPE_HDD, SCOPE_TIMESHIFT, defau
 from Components.NimManager import nimmanager
 from Components.ServiceList import refreshServiceList
 from Components.SystemInfo import SystemInfo, MODEL
+from os.path import exists, isfile, join as pathjoin, normpath
 
 
 # A raw writer for config changes to be read by the logger without

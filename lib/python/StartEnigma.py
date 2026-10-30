@@ -12,7 +12,6 @@ import enigma
 enigma.eTimer = eBaseImpl.eTimer
 enigma.eSocketNotifier = eBaseImpl.eSocketNotifier
 enigma.eConsoleAppContainer = eConsoleImpl.eConsoleAppContainer
-from enigma import getBoxType
 
 
 class Session:
@@ -780,7 +779,8 @@ else:
 	EpgCacheSaveCheck()
 	EpgCacheLoadCheck()
 
-if boxtype in ("dm7080", "dm820", "dm900", "dm920"):
+from Tools.HardwareInfo import HardwareInfo
+if HardwareInfo().get_device_model() in ('dm7080', 'dm820', 'dm900', 'dm920'):
 	print("[StartEnigma] Read /proc/stb/hdmi-rx/0/hdmi_rx_monitor")
 	check = open("/proc/stb/hdmi-rx/0/hdmi_rx_monitor", "r").read()
 	if check.startswith("on"):

@@ -356,10 +356,6 @@ def runScreenTest():
 	Tools.Trashcan.init(session)
 	if not VuRecovery:
 		CiHandler.setSession(session)
-	if SystemInfo["needsVideoJudderDriverFix"]:
-		profile("Init:Components.AVSwitch.VideoJudderDriverFixTask")
-		from Components.AVSwitch import startVideoJudderDriverFixTask
-		startVideoJudderDriverFixTask()
 
 	screensToRun = [p.fnc for p in plugins.getPlugins(PluginDescriptor.WHERE_WIZARD)]
 	profile("wizards")
@@ -372,10 +368,11 @@ def runScreenTest():
 	def runNextScreen(session, screensToRun, *result):
 		if result:
 			if result[0] == "reloadskin":
-				InitSkins(False)
-				session.openWithCallback(boundFunction(runNextScreen, session, []), InfoBar.InfoBar)
+				# close the "Loading skin" notification before the new skin is loaded
 				if result[1]:
 					session.deleteDialog(result[1])
+				InitSkins(False)
+				session.openWithCallback(boundFunction(runNextScreen, session, []), InfoBar.InfoBar)
 			else:
 				enigma.quitMainloop(*result)
 		else:
@@ -783,7 +780,7 @@ else:
 	EpgCacheSaveCheck()
 	EpgCacheLoadCheck()
 
-if boxtype in ('dm7080', 'dm820', 'dm900', 'dm920', 'dreamone', 'dreamtwo'):
+if boxtype in ("dm7080", "dm820", "dm900", "dm920"):
 	print("[StartEnigma] Read /proc/stb/hdmi-rx/0/hdmi_rx_monitor")
 	check = open("/proc/stb/hdmi-rx/0/hdmi_rx_monitor", "r").read()
 	if check.startswith("on"):

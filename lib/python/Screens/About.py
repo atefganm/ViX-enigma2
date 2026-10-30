@@ -3,7 +3,7 @@ from platform import libc_ver
 from re import search, sub
 from requests import get
 from sys import version_info, version as pyversion
-from enigma import eTimer, getDesktop, getEnigmaLastCommitDate, getEnigmaLastCommitHash, eDVBCSAEngine
+from enigma import eTimer, getDesktop, getEnigmaLastCommitDate, getEnigmaLastCommitHash, getEGLVersionString, getGLESVersionString, eDVBCSAEngine
 from Components.About import getBoxUptime, getCPUArch, getEnigmaUptime, getIfConfig, getIfTransferredData
 from Components.ActionMap import ActionMap
 from Components.Button import Button
@@ -45,6 +45,20 @@ def getLastCommitDate():
 
 def getLastCommitHash():
 	return getEnigmaLastCommitHash()[:7]
+
+
+def eglStr():
+	egl = getEGLVersionString().split(' ', 1)[0]
+	if egl:
+		return f"EGL {egl}"
+	return ""
+
+
+def glesStr():
+	gles = getGLESVersionString()
+	if gles:
+		return gles.split(' "', 1)[0]
+	return ""
 
 
 def _formatDate(Date):
@@ -216,6 +230,10 @@ class About(AboutBase):
 		if SystemInfo["imagetype"] != "release":
 			imageSubBuild = ".%s" % SystemInfo["imagedevbuild"]
 		AboutText += _("Image:\t%s.%s%s (%s)\n") % (SystemInfo["imageversion"], SystemInfo["imagebuild"], imageSubBuild, SystemInfo["imagetype"].title())
+
+		egl = " / ".join([x for x in (eglStr(), glesStr()) if x])
+		if egl:
+			AboutText += _("EGL/GLES:\t%s\n") % egl
 
 		AboutText += _("Installed:\t%s\n") % getFlashDateString()
 
@@ -474,6 +492,43 @@ class SystemMemoryInfo(AboutBase):
 		self.AboutText += _("Free:") + "\t" + flash[3] + "\n\n"
 
 		self["AboutScrollLabel"].setText(self.AboutText)
+
+
+class SystemSwapsInfo(AboutBase):
+  def __init__(self, session):
+    AboutBase.__init__(self, session, labels=True)
+    self.setTitle(_("System defined swaps"))
+    self.AboutText = ""
+    self.onLayoutFinish.append(self.updateSwap)
+
+  def updateSwap(self):
+    self.AboutText = ""
+
+    try:
+      with open("/proc/swaps", "r") as f:
+        next(f, None)  # Skip header
+
+        for line in f:
+          parts = line.split()
+          if len(parts) < 3:
+            continue
+
+          try:  # don't crash on rogue output
+            device = parts[0]
+            size_bytes = int(parts[2]) * 1024
+          except ValueError:
+            continue
+
+          size = bytesToHumanReadable(size_bytes, binary=False)
+          self.AboutText += _("%s: %s") % (device, size) + "\n"
+
+      if not self.AboutText:
+        self.AboutText = _("No active swaps found") + "\n"
+
+    except (IOError, ValueError):
+      self.AboutText = _("Unable to read swap information") + "\n"
+
+    self["AboutScrollLabel"].setText(self.AboutText)
 
 
 class SystemNetworkInfo(AboutBase):

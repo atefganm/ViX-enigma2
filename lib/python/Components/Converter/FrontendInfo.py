@@ -3,10 +3,11 @@ from Components.Converter.Converter import Converter
 from Components.config import config
 from Components.Element import cached
 from Components.NimManager import nimmanager
-from Tools.Hex2strColor import ColorizeText
+from skin import parameters
+from Tools.Hex2strColor import Hex2strColor
 
 
-class FrontendInfo(Converter, ColorizeText):
+class FrontendInfo(Converter):
 	BER = 0
 	SNR = 1
 	AGC = 2
@@ -17,56 +18,8 @@ class FrontendInfo(Converter, ColorizeText):
 	STRING = 7
 	USE_TUNERS_STRING = 8
 
-	# Indexes into the "FrontendInfoColors" skin parameter.
-	COLOR_ACTIVE = 0
-	COLOR_BUSY = 1
-	COLOR_AVAILABLE = 2
-	DEFAULT_COLORS = (0x0000FF00, 0x00FFFF00, 0x007F7F7F)  # tuner active, busy, available colors
-
-	# Map each type to the name of the method that produces its text, boolean or value output.
-	# A type missing from a table is not supported for that output and raises when it is used.
-	# "outputNone" is for types that are allowed but have nothing to show.
-	TEXT_HANDLERS = {
-		BER: "textBER",
-		SNR: "textSNR",
-		SNRdB: "textSNRdB",
-		AGC: "textAGC",
-		TUNER_TYPE: "textTunerType",
-		STRING: "textTunerString",
-		USE_TUNERS_STRING: "textUsedTuners"
-	}
-
-	BOOL_HANDLERS = {
-		LOCK: "boolLock",
-		BER: "boolBER",
-		SNR: "boolSNR",
-		SNRdB: "boolSNRdB",
-		AGC: "boolAGC",
-		STRING: "boolText",
-		USE_TUNERS_STRING: "boolText"
-	}
-
-	VALUE_HANDLERS = {
-		BER: "valueBER",
-		SNR: "valueSNR",
-		SNRdB: "outputNone",
-		AGC: "valueAGC",
-		SLOT_NUMBER: "valueSlotNumber",
-		TUNER_TYPE: "valueTunerType",
-		STRING: "outputNone",
-		USE_TUNERS_STRING: "outputNone"
-	}
-
-	FRONTEND_TYPE_VALUES = {
-		"DVB-S": 0,
-		"DVB-C": 1,
-		"DVB-T": 2,
-		"ATSC": 3
-	}
-
 	def __init__(self, type):
 		Converter.__init__(self, type)
-		ColorizeText.__init__(self, "FrontendInfoColors", self.DEFAULT_COLORS)
 		if type == "BER":
 			self.type = self.BER
 		elif type == "SNR":
@@ -89,18 +42,107 @@ class FrontendInfo(Converter, ColorizeText):
 			self.type = self.USE_TUNERS_STRING
 		else:
 			self.type = self.LOCK
-		# Resolve the handlers once; the getters never have to work out the type again.
-		self.textHandler = getattr(self, self.TEXT_HANDLERS.get(self.type, "textUnsupported"))
-		self.boolHandler = getattr(self, self.BOOL_HANDLERS.get(self.type, "boolUnsupported"))
-		self.valueHandler = getattr(self, self.VALUE_HANDLERS.get(self.type, "valueUnsupported"))
+
+	def getAGC(self):
+		agc = self.source.agc
+		# Si2166D/Si2169D frontends report a small bogus non-zero AGC
+		# value (seen: 89-124) instead of None, ignore it and fall
+		# through to the SNR-based estimate below
+		if agc and agc > 255:
+			return agc
+
+		# Some frontends do not expose signal strength through either
+		# DTV_STAT_SIGNAL_STRENGTH or FE_READ_SIGNAL_STRENGTH.  Keep using
+		# the driver's value when available and estimate a display value
+		# from signal quality only as a fallback.
+		snr = self.source.snr
+		if not snr:
+			return agc
+		snr_percent = snr * 100.0 / 65535.0
+		if snr_percent < 35:
+			agc_percent = snr_percent * 1.8
+		elif snr_percent < 70:
+			agc_percent = 63 + ((snr_percent - 35) * 0.8)
+		else:
+			agc_percent = 91 + ((snr_percent - 70) * 0.3)
+		return round(min(100, agc_percent) * self.range / 100.0)
 
 	@cached
 	def getText(self):
-		return self.textHandler()
+		assert self.type not in (self.LOCK, self.SLOT_NUMBER), "the text output of FrontendInfo cannot be used for lock info"
+		percent = None
+		swapsnr = config.usage.swap_snr_on_osd.value
+		colors = parameters.get("FrontendInfoColors", (0x0000FF00, 0x00FFFF00, 0x007F7F7F))  # tuner active, busy, available colors
+		if self.type == self.BER:  # as count
+			count = self.source.ber
+			if count is not None:
+				return str(count)
+			else:
+				return _("N/A")
+		elif self.type == self.AGC:
+			percent = self.getAGC()
+		elif (self.type == self.SNR and not swapsnr) or (self.type == self.SNRdB and swapsnr):
+			percent = self.source.snr
+		elif self.type == self.SNR or self.type == self.SNRdB:
+			if self.source.snr_db is not None:
+				return _("%3.01f dB") % (self.source.snr_db / 100.0)
+			elif self.source.snr is not None:  # fallback to normal SNR...
+				percent = self.source.snr
+		elif self.type == self.TUNER_TYPE:
+			return self.source.frontend_type or _("Unknown")
+		elif self.type == self.STRING:
+			string = ""
+			for n in nimmanager.nim_slots:
+				if n.enabled:
+					if n.slot == self.source.slot_number:
+						color = Hex2strColor(colors[0])
+					elif self.source.tuner_mask & 1 << n.slot:
+						color = Hex2strColor(colors[1])
+					elif len(nimmanager.nim_slots) <= self.space_for_tuners or n.isFBCRoot() or self.show_all_non_link_tuners and not (n.isFBCLink() or n.config_mode == "loopthrough"):
+						color = Hex2strColor(colors[2])
+					else:
+						continue
+					if string and len(nimmanager.nim_slots) <= self.space_for_tuners_with_spaces:
+						string += " "
+					string += color + chr(ord("A") + n.slot)
+			return string
+		if self.type == self.USE_TUNERS_STRING:
+			string = ""
+			for n in nimmanager.nim_slots:
+				if n.enabled:
+					if n.slot == self.source.slot_number:
+						color = Hex2strColor(colors[0])
+					elif self.source.tuner_mask & 1 << n.slot:
+						color = Hex2strColor(colors[1])
+					else:
+						continue
+					if string:
+						string += " "
+					string += color + chr(ord("A") + n.slot)
+			return string
+		if percent is None:
+			return _("N/A")
+		return "%d %%" % (percent * 100 / 65535)
 
 	@cached
 	def getBool(self):
-		return self.boolHandler()
+		assert self.type in (self.LOCK, self.BER, self.SNR, self.SNRdB, self.AGC, self.STRING, self.USE_TUNERS_STRING), "the boolean output of FrontendInfo can only be used for lock, BER, SNR, SNRdB, AGC, STRING, or  USE_TUNERS_STRING"
+		swapsnr = config.usage.swap_snr_on_osd.value
+		if self.type == self.LOCK:
+			lock = self.source.lock
+			if lock is None:
+				lock = False
+			return lock
+		elif self.type == self.BER:
+			return self.source.ber is not None
+		elif (self.type == self.SNR and not swapsnr) or (self.type == self.SNRdB and swapsnr):
+			return self.source.snr is not None
+		elif self.type == self.SNR or self.type == self.SNRdB:
+			return (self.source.snr_db is not None or self.source.snr is not None)
+		elif self.type == self.AGC:
+			return self.source.agc is not None
+		elif self.type in (self.STRING, self.USE_TUNERS_STRING):
+			return bool(self.getText())
 
 	text = property(getText)
 
@@ -108,137 +150,30 @@ class FrontendInfo(Converter, ColorizeText):
 
 	@cached
 	def getValue(self):
-		return self.valueHandler()
+		assert self.type != self.LOCK, "the value/range output of FrontendInfo can not be used for lock info"
+		if self.type == self.AGC:
+			return self.getAGC() or 0
+		elif self.type == self.SNR:
+			return self.source.snr or 0
+		elif self.type == self.BER:
+			if (self.source.ber or 0) < self.range:
+				return self.source.ber or 0
+			else:
+				return self.range
+		elif self.type == self.TUNER_TYPE:
+			type = self.source.frontend_type
+			if type == 'DVB-S':
+				return 0
+			elif type == 'DVB-C':
+				return 1
+			elif type == 'DVB-T':
+				return 2
+			elif type == 'ATSC':
+				return 3
+			return -1
+		elif self.type == self.SLOT_NUMBER:
+			num = self.source.slot_number
+			return num is None and -1 or num
 
-	range = 65535  # name inherited from old code
+	range = 65535
 	value = property(getValue)
-
-	# ---- Shared ----
-
-	def outputNone(self):  # not for text, where "" would be required
-		return None
-
-	def textUnsupported(self):
-		raise AssertionError("the text output of FrontendInfo cannot be used for lock info")
-
-	def boolUnsupported(self):
-		raise AssertionError("the boolean output of FrontendInfo can only be used for lock, BER, SNR, SNRdB, AGC, STRING, or USE_TUNERS_STRING")
-
-	def valueUnsupported(self):
-		raise AssertionError("the value/range output of FrontendInfo can not be used for lock info")
-
-	def percentText(self, percent):
-		if percent is None:
-			return _("N/A")
-		return "%d %%" % (percent * 100 / 65535)
-
-	# ---- Text ----
-
-	def textBER(self):  # As count.
-		count = self.source.ber
-		return str(count) if count is not None else _("N/A")
-
-	def textAGC(self):
-		return self.percentText(self.source.agc)
-
-	def textSNR(self):
-		return self.snrText(not config.usage.swap_snr_on_osd.value)
-
-	def textSNRdB(self):
-		return self.snrText(bool(config.usage.swap_snr_on_osd.value))
-
-	def snrText(self, asPercent):
-		if asPercent:
-			return self.percentText(self.source.snr)
-		snr_db = self.source.snr_db
-		if snr_db is not None:
-			return _("%3.01f dB") % (snr_db / 100.0)
-		return self.percentText(self.source.snr)  # Fall back to the normal SNR.
-
-	def textTunerType(self):
-		return self.source.frontend_type or _("Unknown")
-
-	def textTunerString(self):
-		slots = nimmanager.nim_slots
-		slotCount = len(slots)
-		slot_number = self.source.slot_number
-		tuner_mask = self.source.tuner_mask
-		string = ""
-		for n in slots:
-			if n.enabled:
-				if n.slot == slot_number:
-					colorIndex = self.COLOR_ACTIVE
-				elif tuner_mask & 1 << n.slot:
-					colorIndex = self.COLOR_BUSY
-				elif slotCount <= self.space_for_tuners or n.isFBCRoot() or self.show_all_non_link_tuners and not (n.isFBCLink() or n.config_mode == "loopthrough"):
-					colorIndex = self.COLOR_AVAILABLE
-				else:
-					continue
-				if string and slotCount <= self.space_for_tuners_with_spaces:
-					string += " "
-				string += self.addColor(chr(ord("A") + n.slot), colorIndex)
-		return string
-
-	def textUsedTuners(self):
-		slot_number = self.source.slot_number
-		tuner_mask = self.source.tuner_mask
-		string = ""
-		for n in nimmanager.nim_slots:
-			if n.enabled:
-				if n.slot == slot_number:
-					colorIndex = self.COLOR_ACTIVE
-				elif tuner_mask & 1 << n.slot:
-					colorIndex = self.COLOR_BUSY
-				else:
-					continue
-				if string:
-					string += " "
-				string += self.addColor(chr(ord("A") + n.slot), colorIndex)
-		return string
-
-	# ---- Boolean ----
-
-	def boolLock(self):
-		lock = self.source.lock
-		if lock is None:
-			lock = False
-		return lock
-
-	def boolBER(self):
-		return self.source.ber is not None
-
-	def boolSNR(self):
-		return self.snrAvailable(not config.usage.swap_snr_on_osd.value)
-
-	def boolSNRdB(self):
-		return self.snrAvailable(bool(config.usage.swap_snr_on_osd.value))
-
-	def snrAvailable(self, asPercent):
-		if asPercent:
-			return self.source.snr is not None
-		return self.source.snr_db is not None or self.source.snr is not None
-
-	def boolAGC(self):
-		return self.source.agc is not None
-
-	def boolText(self):
-		return bool(self.getText())
-
-	# ---- Value ----
-
-	def valueAGC(self):
-		return self.source.agc or 0
-
-	def valueSNR(self):
-		return self.source.snr or 0
-
-	def valueBER(self):
-		ber = self.source.ber or 0
-		return ber if ber < self.range else self.range
-
-	def valueTunerType(self):
-		return self.FRONTEND_TYPE_VALUES.get(self.source.frontend_type, -1)
-
-	def valueSlotNumber(self):
-		num = self.source.slot_number
-		return -1 if num is None else num

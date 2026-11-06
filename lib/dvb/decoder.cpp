@@ -305,7 +305,7 @@ int eDVBVideo::m_close_invalidates_attributes = -1;
 
 eDVBVideo::eDVBVideo(eDVBDemux *demux, int dev, bool fcc_enable)
 	: m_demux(demux), m_dev(dev), m_fcc_enable(fcc_enable),
-	m_width(-1), m_height(-1), m_framerate(-1), m_aspect(-1), m_progressive(-1), m_gamma(-1)
+	m_width(-1), m_height(-1), m_framerate(-1), m_aspect(-1), m_progressive(-1), m_gamma(-1), m_streamtype(-1)
 {
 	char filename[128] = {};
 	sprintf(filename, "/dev/dvb/adapter%d/video%d", demux ? demux->adapter : 0, dev);
@@ -412,11 +412,18 @@ int eDVBVideo::startPid(int pid, int type)
 			break;
 		}
 
-		eDebugNoNewLineStart("[eDVBVideo%d] VIDEO_SET_STREAMTYPE %d - ", m_dev, streamtype);
-		if (::ioctl(m_fd, VIDEO_SET_STREAMTYPE, streamtype) < 0)
-			eDebugNoNewLine("failed: %m\n");
+		if (m_streamtype != streamtype) {
+			if(eDVBVideo::m_debug)
+			{
+				eDebugNoNewLineStart("[eDVBVideo%d] VIDEO_SET_STREAMTYPE %d - ", m_dev, streamtype);
+				if (::ioctl(m_fd, VIDEO_SET_STREAMTYPE, streamtype) < 0)
+					eDebugNoNewLine("failed: %m");
+				else
+					eDebugNoNewLine("ok");
+			}
 		else
-			eDebugNoNewLine("ok\n");
+				::ioctl(m_fd, VIDEO_SET_STREAMTYPE, streamtype);
+			m_streamtype = streamtype;
 	}
 
 	if (m_fd_demux >= 0)

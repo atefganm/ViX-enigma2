@@ -1,8 +1,7 @@
 #include <lib/base/cfile.h>
 #include <lib/base/ebase.h>
 #include <lib/base/eerror.h>
-#include <lib/base/eenv.h>
-#include <lib/base/nconfig.h>
+#include <lib/base/nconfig.h> // access to python config
 #include <lib/base/wrappers.h>
 #include <lib/dvb/decoder.h>
 #ifdef HAVE_EGL
@@ -20,8 +19,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
-#include <time.h>
-#include <vector>
 
 #include <lib/dvb/fccdecoder.h>
 
@@ -305,7 +302,7 @@ int eDVBVideo::m_close_invalidates_attributes = -1;
 
 eDVBVideo::eDVBVideo(eDVBDemux *demux, int dev, bool fcc_enable)
 	: m_demux(demux), m_dev(dev), m_fcc_enable(fcc_enable),
-	m_width(-1), m_height(-1), m_framerate(-1), m_aspect(-1), m_progressive(-1), m_gamma(-1), m_streamtype(-1)
+	m_width(-1), m_height(-1), m_framerate(-1), m_aspect(-1), m_progressive(-1), m_gamma(-1)
 {
 	char filename[128] = {};
 	sprintf(filename, "/dev/dvb/adapter%d/video%d", demux ? demux->adapter : 0, dev);
@@ -332,10 +329,14 @@ eDVBVideo::eDVBVideo(eDVBDemux *demux, int dev, bool fcc_enable)
 		m_fd_demux = -1;
 	}
 
+std::string zapmodeDM = eConfigManager::getConfigValue("config.misc.zapmodeDM");
+if (zapmodeDM == "hold")
+{
 	if (m_fd >= 0)
 	{
 		::ioctl(m_fd, VIDEO_SELECT_SOURCE, demux ? VIDEO_SOURCE_DEMUX : VIDEO_SOURCE_HDMI);
 	}
+}
 
 	if (m_close_invalidates_attributes < 0)
 	{
@@ -412,17 +413,11 @@ int eDVBVideo::startPid(int pid, int type)
 			break;
 		}
 
-		if (m_streamtype != streamtype) {
-			if(eDVBVideo::m_debug)
-			{
-				eDebugNoNewLineStart("[eDVBVideo%d] VIDEO_SET_STREAMTYPE %d - ", m_dev, streamtype);
-				if (::ioctl(m_fd, VIDEO_SET_STREAMTYPE, streamtype) < 0)
-					eDebugNoNewLine("failed: %m");
-				else
-					eDebugNoNewLine("ok");
+		eDebugNoNewLineStart("[eDVBVideo%d] VIDEO_SET_STREAMTYPE %d - ", m_dev, streamtype);
+		if (::ioctl(m_fd, VIDEO_SET_STREAMTYPE, streamtype) < 0)
+			eDebugNoNewLine("failed: %m\n");
 		else
-				::ioctl(m_fd, VIDEO_SET_STREAMTYPE, streamtype);
-			m_streamtype = streamtype;
+			eDebugNoNewLine("ok\n");
 	}
 
 	if (m_fd_demux >= 0)
@@ -499,72 +494,6 @@ void eDVBVideo::stop()
 		else
 			eDebugNoNewLine("ok\n");
 	}
-}
-
-void eDVBVideo::clearLastFrame()
-{
-#if defined(HWDM900) || defined(HWDM920) || defined(HWDM820) || defined(HWDM7080)
-	// These drivers retain the displayed frame despite VIDEO_STOP(1).
-	// Replace it before releasing the main decoder, so radio and services
-	// without decodable video cannot expose the previous channel's picture.
-	if (m_dev != 0 || !m_demux || m_demux->adapter != 0)
-		return;
-
-	static const std::vector<unsigned char> blackFrame = []() {
-		std::vector<unsigned char> frame;
-		CFile file(eEnv::resolve("${datadir}/enigma2/black.mvi"), "rb");
-		struct stat status = {};
-		if (!file || fstat(fileno(file), &status) || status.st_size < 6 || status.st_size > 65536)
-		{
-			eWarning("[eDVBVideo] Cannot load black still picture");
-			return frame;
-		}
-		frame.resize(status.st_size);
-		if (fread(frame.data(), 1, frame.size(), file) != frame.size())
-		{
-			eWarning("[eDVBVideo] Cannot read black still picture");
-			frame.clear();
-		}
-		else if ((frame[3] >> 4) == 0xE)
-			frame[4] = frame[5] = 0;
-		return frame;
-	}();
-	if (blackFrame.empty())
-		return;
-
-	const unsigned char pesHeader[] = {0, 0, 1, 0xE0, 0, 0, 0x80, 0x80, 5, 0x21, 0, 1, 0, 1};
-	const unsigned char sequenceEnd[] = {0, 0, 1, 0xB7};
-	const unsigned char stuffing[8192] = {};
-	bool started = false;
-	if (::ioctl(m_fd, VIDEO_SELECT_SOURCE, VIDEO_SOURCE_MEMORY) == 0 &&
-		::ioctl(m_fd, VIDEO_SET_STREAMTYPE, VIDEO_STREAMTYPE_MPEG2) == 0 &&
-		::ioctl(m_fd, VIDEO_PLAY) == 0)
-	{
-		started = true;
-		m_streamtype = VIDEO_STREAMTYPE_MPEG2;
-		bool written = ::ioctl(m_fd, VIDEO_CONTINUE) == 0 && ::ioctl(m_fd, VIDEO_CLEAR_BUFFER) == 0;
-		written = written && ((blackFrame[3] >> 4) == 0xE ||
-			writeAll(m_fd, pesHeader, sizeof(pesHeader)) == sizeof(pesHeader));
-		written = written && writeAll(m_fd, blackFrame.data(), blackFrame.size()) == (ssize_t)blackFrame.size();
-		written = written && writeAll(m_fd, sequenceEnd, sizeof(sequenceEnd)) == sizeof(sequenceEnd);
-		written = written && writeAll(m_fd, stuffing, sizeof(stuffing)) == sizeof(stuffing);
-		if (written)
-		{
-			// Match the existing still-picture decoder interval. Keep ownership
-			// until completion; a timer must never stop the following service.
-			struct timespec remaining = {0, 150000000};
-			while (nanosleep(&remaining, &remaining) && errno == EINTR) {}
-		}
-		else
-			eWarning("[eDVBVideo] Cannot feed black still picture: %m");
-	}
-	else
-		eWarning("[eDVBVideo] Cannot start black still picture: %m");
-	if (started && ::ioctl(m_fd, VIDEO_STOP, 0) < 0)
-		eWarning("[eDVBVideo] Cannot stop black still picture: %m");
-	if (::ioctl(m_fd, VIDEO_SELECT_SOURCE, VIDEO_SOURCE_DEMUX) < 0)
-		eWarning("[eDVBVideo] Cannot restore video demux source: %m");
-#endif
 }
 
 void eDVBVideo::flush()

@@ -258,11 +258,6 @@ int bcm_accel_init(void)
 	/* hardware doesn't allow us to detect whether the opcode is working */
 	supportblendingflags = false;
 #endif
-#ifdef FORCE_ALPHABLENDING_ACCELERATION
-	/* the probe above doesn't get a reply from this driver even though
-	 * blending is known to work, so trust it instead of the probe */
-	supportblendingflags = true;
-#endif
 	return 0;
 }
 
@@ -582,8 +577,6 @@ int bcm_accel_sync()
 			DREAMBCM_BCM_STAT_INC(s_bcm_sync_exec);
 			if (dreambcm_bcm_trace_enabled())
 				eDebug("[dreamBCM:bcm] sync exec ptr=%d", ptr);
-#else
-			eDebug("bcm_accel_sync: ptr %d", ptr);
 #endif
 			retval = exec_list("sync");
 		}
@@ -891,6 +884,7 @@ int bcm_accel_blit(
 	dreambcm_bcm_restore_accumulate(restore_accumulate);
 #endif
 	return ret;
+}
 
 void bcm_accel_fill(
 		int dst_addr, int dst_width, int dst_height, int dst_stride,

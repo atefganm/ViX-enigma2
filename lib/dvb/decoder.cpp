@@ -420,7 +420,6 @@ int eDVBVideo::startPid(int pid, int type)
 					eDebugNoNewLine("failed: %m");
 				else
 					eDebugNoNewLine("ok");
-			}
 		else
 				::ioctl(m_fd, VIDEO_SET_STREAMTYPE, streamtype);
 			m_streamtype = streamtype;

@@ -298,10 +298,16 @@ elif test x"$with_alphablendingacceleration" = xalways ; then
 	AC_DEFINE_UNQUOTED(FORCE_ALPHABLENDING_ACCELERATION, 1, [Accelerate alphablending blits])
 fi
 
+if test "$BOXTYPE" == "dm7080" -o "$BOXTYPE" == "dm820" -o "$BOXTYPE" == "dm900" -o "$BOXTYPE" == "dm920" -o "$BOXTYPE" == "dm520"; then
+	default_accelerationaccumulation=yes
+else
+	default_accelerationaccumulation=no
+fi
+
 AC_ARG_WITH(accelerationaccumulation,
 	AS_HELP_STRING([--with-accelerationaccumulation], [accumulate blit/fill acceleration operations]),
 	[[with_accelerationaccumulation=$withval]],
-	[[with_accelerationaccumulation=no]]
+	[[with_accelerationaccumulation=$default_accelerationaccumulation]]
 )
 
 if test x"$with_accelerationaccumulation" = xyes ; then
@@ -642,6 +648,7 @@ fi
 
 if test "$BOXTYPE" == "dm7080" -o "$BOXTYPE" == "dm820" -o "$BOXTYPE" == "dm900" -o "$BOXTYPE" == "dm920" -o "$BOXTYPE" == "dm520"; then
 	AC_DEFINE(CONFIG_ION, 1,[define BOX use ION Allocator])
+	AC_DEFINE(DREAMBCM_ION_ACCEL, 1,[define Dreambox Broadcom ION framebuffer acceleration])
 fi
 
 if test "$BOXTYPE" == "dm7080" -o "$BOXTYPE" == "dm820" -o "$BOXTYPE" == "dm800se" -o "$BOXTYPE" == "dm800sev2" -o "$BOXTYPE" == "dm7020hd" -o "$BOXTYPE" == "dm7020hdv2" -o "$BOXTYPE" == "dm900" -o "$BOXTYPE" == "dm920"; then

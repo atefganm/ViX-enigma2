@@ -26,6 +26,7 @@ public:
 
 	int accelAlloc(gUnmanagedSurface* surface);
 	void accelFree(gUnmanagedSurface* surface);
+	void dreamBCMPagecopyStat();
 
 	// Cheap, lock-free check for whether setAccelMemorySpace() ever ran (it's
 	// only ever written once, at startup, before any surface allocation can

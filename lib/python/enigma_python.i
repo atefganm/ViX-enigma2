@@ -119,6 +119,7 @@ is usually caused by not marking PSignals as immutable.
 #include <lib/python/python_helpers.h>
 #include <lib/gdi/picload.h>
 #include <lib/dvb/fcc.h>
+#include <lib/gdi/accel.h>
 #include <include/hardwaredb.h>
 %}
 
@@ -295,6 +296,8 @@ typedef long time_t;
 %include <lib/gdi/picload.h>
 %include <lib/dvb/fcc.h>
 %include <lib/dvb/streamserver.h>
+%include <lib/gdi/accel.h>
+
 /**************  eptr  **************/
 
 /**************  signals  **************/
@@ -490,6 +493,14 @@ PyObject *getDeviceDB()
 		PutToDict(result, key.c_str(), value.c_str());
 	}
     return result;
+}
+%}
+
+void setACCELDebug(int);
+%{
+void setACCELDebug(int enable)
+{
+	gAccel::getInstance()->setAccelDebug(enable);
 }
 %}
 
